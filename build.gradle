@@ -7,7 +7,30 @@ sourceCompatibility = 1.8
 repositories {
     mavenCentral()
 }
-
-dependencies {
-    testCompile group: 'junit', name: 'junit', version: '4.12'
+tasks.withType(JavaCompile) {
+    options.encoding = "UTF-8"
 }
+//如果生成javadoc出现编码问题添加
+javadoc {
+    options {
+        encoding "UTF-8"
+        charSet 'UTF-8'
+        author true
+        version true
+        links "http://docs.oracle.com/javase/7/docs/api"
+        title "myproject"
+    }
+}
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/Lab1/']
+        }
+    }
+    test {
+        java {
+            srcDirs = ['test']
+        }
+    }
+}
+
