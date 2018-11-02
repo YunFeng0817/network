@@ -3,30 +3,23 @@ import java.net.ConnectException;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class Client implements Runnable {
     private Socket Client;
     private Socket ProxyClient;
-    private String Host;
-    private long LatestDataTransportTime; // The latest time when socket has data transport
+    private ProtocolHeader header;
     private final long aliveTime = 10000;
     private FireWall FileWall;
 
     Client(Socket Client, FireWall fireWall) {
         this.Client = Client;
         this.ProxyClient = null;
-        this.Host = "";
         this.FileWall = fireWall;
     }
 
     @Override
     public void run() {
         ByteArrayOutputStream ClientCache = new ByteArrayOutputStream(); // used to cache the data from the client
-        ByteArrayOutputStream ServerCache; // used to cache the data from the server
-        int HTTPPort = 80;
-        int HTTPSPort = 443;
         try {
             Client.setSoTimeout(200);
             CloneStream(ClientCache, Client.getInputStream());
@@ -36,46 +29,29 @@ public class Client implements Runnable {
             e.printStackTrace();
         }
         BufferedReader ObtainReader = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(ClientCache.toByteArray())));
-        String line;
         // parse the http or https header
         try {
-            while (!((line = ObtainReader.readLine()) == null || line.isEmpty())) {
-                Pattern HostPattern = Pattern.compile("Host:\\s*([\\w.-]*)");
-                Pattern ConnectPattern = Pattern.compile("CONNECT \\s*([\\w.-]*):443.*");
-                Matcher HostMatcher = HostPattern.matcher(line);
-                Matcher ConnectMatcher = ConnectPattern.matcher(line);
-                if (ConnectMatcher.find()) {  // connect to HTTPS
-                    this.Host = ConnectMatcher.group(1);
-                    // filter some host by fire wall
-                    if (!FileWall.isHostForbidden(this.Host)) {
-                        System.out.println("HTTPS request to Host: " + Host);
-                        Client.getOutputStream().write("HTTP/1.1 200 Connection established\r\n\r\n".getBytes());
-                        this.ProxyClient = new Socket(this.Host, HTTPSPort);
-                    } else {
-                        System.err.println("Forbid the destiny host: " + this.Host);
-                    }
-                    break;
+            header = new ProtocolHeader(ObtainReader);
+            // filter some host by fire wall
+            if (!FileWall.isHostForbidden(header.getHost())) {
+                this.ProxyClient = new Socket(header.getHost(), header.getPort());
+                if (header.getPort() == 80) {
+                    System.out.println("HTTP request to Host: " + header.getHost());
+                    ProxyClient.getOutputStream().write(ClientCache.toByteArray());
+                } else if (header.getPort() == 443) {
+                    System.out.println("HTTPS request to Host: " + header.getHost());
+                    Client.getOutputStream().write("HTTP/1.1 200 Connection established\r\n\r\n".getBytes());
                 }
-                if (HostMatcher.find()) { // connect to HTTP
-                    this.Host = HostMatcher.group(1);
-                    // filter some host by fire wall
-                    if (!FileWall.isHostForbidden(this.Host)) {
-                        System.out.println("HTTP request to Host: " + Host);
-                        this.ProxyClient = new Socket(this.Host, HTTPPort);
-                        ProxyClient.getOutputStream().write(ClientCache.toByteArray());
-                    } else {
-                        System.err.println("Forbid the destiny host: " + this.Host);
-                    }
-                    break;
-                }
+            } else {
+                System.err.println("Forbid the destiny host: " + header.getHost());
             }
             if (ProxyClient != null)
                 ProxyClient.setSoTimeout(200);
         } catch (ConnectException e) {
             if (e.getMessage().equals("Connection timed out: connect")) {
-                System.err.println("Connect to Host: " + this.Host + " time out");
+                System.err.println("Connect to Host: " + header.getHost() + " time out");
             } else if (e.getMessage().equals("Connection refused: connect")) {
-                System.err.println("Connect to Host: " + this.Host + " refused");
+                System.err.println("Connect to Host: " + header.getHost() + " refused");
             } else
                 e.printStackTrace();
             CloseAllConnect();
@@ -88,35 +64,14 @@ public class Client implements Runnable {
             e.printStackTrace();
         }
         // transport data from server to client
-        while (ProxyClient != null && !(Client.isClosed() || ProxyClient.isClosed())) {
-            try {
-                ClientCache = new ByteArrayOutputStream();
-                try {
-                    Client.setSoTimeout(200);
-                    CloneStream(ClientCache, Client.getInputStream());
-                } catch (SocketTimeoutException e) {
-
-                }
-                ProxyClient.getOutputStream().write(ClientCache.toByteArray());
-
-                ServerCache = new ByteArrayOutputStream();
-                try {
-                    CloneStream(ServerCache, ProxyClient.getInputStream());
-                } catch (SocketTimeoutException e) {
-
-                }
-                if (ClientCache.size() == 0 && ServerCache.size() == 0) {
-                    // connection out of time, close the socket
-                    if (System.currentTimeMillis() - LatestDataTransportTime > aliveTime)
-                        break;
-                } else
-                    LatestDataTransportTime = System.currentTimeMillis();
-                Client.getOutputStream().write(ServerCache.toByteArray());
-                ClientCache.close();
-                ServerCache.close();
-            } catch (Exception e) {
-                break;
-            }
+        ProxyForward forward;
+        switch (header.getPort()) {
+            case 80:
+                forward = new HTTPForward();
+                forward.ProxyForward(Client, ProxyClient, aliveTime);
+            case 443:
+                forward = new HTTPSForward();
+                forward.ProxyForward(Client, ProxyClient, aliveTime);
         }
         CloseAllConnect();
     }
@@ -142,7 +97,7 @@ public class Client implements Runnable {
      * @param InputStream the input stream to be cloned
      * @throws IOException when read input stream, some exception occur
      */
-    private static void CloneStream(ByteArrayOutputStream CloneResult, InputStream InputStream) throws IOException {
+    static void CloneStream(ByteArrayOutputStream CloneResult, InputStream InputStream) throws IOException {
         byte[] buffer = new byte[1024];
         int length;
         while ((length = InputStream.read(buffer)) != -1) {
