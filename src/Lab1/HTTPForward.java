@@ -4,11 +4,11 @@ import java.net.SocketTimeoutException;
 
 public class HTTPForward implements ProxyForward {
     @Override
-    public void ProxyForward(Socket client, Socket serer, long MaxWaitTime) {
+    public void ProxyForward(Socket client, Socket server, long MaxWaitTime) {
         long LatestDataTransportTime = System.currentTimeMillis();
         ByteArrayOutputStream ClientCache; // used to cache the data from the client
         ByteArrayOutputStream ServerCache; // used to cache the data from the server
-        while (serer != null && !(client.isClosed() || serer.isClosed())) {
+        while (server != null && !(client.isClosed() || server.isClosed())) {
             try {
                 ClientCache = new ByteArrayOutputStream();
                 try {
@@ -17,11 +17,11 @@ public class HTTPForward implements ProxyForward {
                 } catch (SocketTimeoutException e) {
 
                 }
-                serer.getOutputStream().write(ClientCache.toByteArray());
+                server.getOutputStream().write(ClientCache.toByteArray());
 
                 ServerCache = new ByteArrayOutputStream();
                 try {
-                    Client.CloneStream(ServerCache, serer.getInputStream());
+                    Client.CloneStream(ServerCache, server.getInputStream());
                 } catch (SocketTimeoutException e) {
 
                 }

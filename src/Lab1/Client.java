@@ -53,7 +53,7 @@ public class Client implements Runnable {
             } else if (e.getMessage().equals("Connection refused: connect")) {
                 System.err.println("Connect to Host: " + header.getHost() + " refused");
             } else
-                e.printStackTrace();
+                System.err.println(e.getMessage());
             CloseAllConnect();
 
         } catch (UnknownHostException e) {
@@ -67,6 +67,9 @@ public class Client implements Runnable {
         ProxyForward forward;
         switch (header.getPort()) {
             case 80:
+                // Phish http proxy forward mode
+//                forward = new PhishForward();
+                // normal http proxy forward mode
                 forward = new HTTPForward();
                 forward.ProxyForward(Client, ProxyClient, aliveTime);
             case 443:
