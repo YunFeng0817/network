@@ -5,7 +5,8 @@
     "www.google-analytics.com",
     "mtalk.google.com",
     "#github.com",
-    "#blog.csdn.net"
+    "#blog.csdn.net",
+    "#jwts.hit.edu.cn"
   ],
   "forbidden_clients": [
     "#127.0.0.1"
