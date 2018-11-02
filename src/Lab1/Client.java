@@ -11,7 +11,7 @@ public class Client implements Runnable {
     private Socket ProxyClient;
     private String Host;
     private long LatestDataTransportTime; // The latest time when socket has data transport
-    private final long aliveTime = 30000;
+    private final long aliveTime = 10000;
     private FireWall FileWall;
 
     Client(Socket Client, FireWall fireWall) {
@@ -46,16 +46,26 @@ public class Client implements Runnable {
                 Matcher ConnectMatcher = ConnectPattern.matcher(line);
                 if (ConnectMatcher.find()) {  // connect to HTTPS
                     this.Host = ConnectMatcher.group(1);
-                    System.out.println("HTTPS request to Host: " + Host);
-                    Client.getOutputStream().write("HTTP/1.1 200 Connection established\r\n\r\n".getBytes());
-                    this.ProxyClient = new Socket(this.Host, HTTPSPort);
+                    // filter some host by fire wall
+                    if (!FileWall.isHostForbidden(this.Host)) {
+                        System.out.println("HTTPS request to Host: " + Host);
+                        Client.getOutputStream().write("HTTP/1.1 200 Connection established\r\n\r\n".getBytes());
+                        this.ProxyClient = new Socket(this.Host, HTTPSPort);
+                    } else {
+                        System.err.println("Forbid the destiny host: " + this.Host);
+                    }
                     break;
                 }
                 if (HostMatcher.find()) { // connect to HTTP
                     this.Host = HostMatcher.group(1);
-                    System.out.println("HTTP request to Host: " + Host);
-                    this.ProxyClient = new Socket(this.Host, HTTPPort);
-                    ProxyClient.getOutputStream().write(ClientCache.toByteArray());
+                    // filter some host by fire wall
+                    if (!FileWall.isHostForbidden(this.Host)) {
+                        System.out.println("HTTP request to Host: " + Host);
+                        this.ProxyClient = new Socket(this.Host, HTTPPort);
+                        ProxyClient.getOutputStream().write(ClientCache.toByteArray());
+                    } else {
+                        System.err.println("Forbid the destiny host: " + this.Host);
+                    }
                     break;
                 }
             }
@@ -77,10 +87,8 @@ public class Client implements Runnable {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        if (FileWall.isForbidden(this.Host))
-            CloseAllConnect();
         // transport data from server to client
-        while (!(Client.isClosed() || ProxyClient.isClosed())) {
+        while (ProxyClient != null && !(Client.isClosed() || ProxyClient.isClosed())) {
             try {
                 ClientCache = new ByteArrayOutputStream();
                 try {

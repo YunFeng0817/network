@@ -7,7 +7,7 @@ import java.util.Set;
 import com.google.gson.*;
 
 class FireWall {
-    private ForbiddenHost ForbiddenHost;
+    private ForbiddenForm ForbiddenForm;
 
     FireWall(String configPath) throws IOException {
         File file = new File(configPath);
@@ -18,22 +18,33 @@ class FireWall {
             FileContent.append(line);
         }
         Gson gson = new Gson();
-        ForbiddenHost = gson.fromJson(FileContent.toString(), FireWall.ForbiddenHost.class);
+        ForbiddenForm = gson.fromJson(FileContent.toString(), ForbiddenForm.class);
     }
 
-    public boolean isForbidden(String host) {
-        return ForbiddenHost.getHosts().contains(host);
+    boolean isHostForbidden(String host) {
+        return ForbiddenForm.getHosts().contains(host);
     }
 
-    private class ForbiddenHost {
-        private List<String> Forbidden_hosts = new ArrayList<>();
+    boolean isClientForbidden(String client) {
+        return ForbiddenForm.getClients().contains(client);
+    }
 
-        ForbiddenHost(List<String> host) {
-            this.Forbidden_hosts = host;
+    private class ForbiddenForm {
+        private List<String> forbidden_hosts = new ArrayList<>();
+        private List<String> forbidden_clients = new ArrayList<>();
+
+        ForbiddenForm(List<String> hosts, List<String> clients) {
+            this.forbidden_hosts = hosts;
+            this.forbidden_clients = clients;
         }
 
         Set<String> getHosts() {
-            return new HashSet<>(Forbidden_hosts);
+            return new HashSet<>(forbidden_hosts);
+        }
+
+        Set<String> getClients() {
+            return new HashSet<>(forbidden_clients);
         }
     }
+
 }

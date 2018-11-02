@@ -1,6 +1,12 @@
 {
-  "Forbidden_hosts": [
-    "github.com",
-    "blog.csdn.net"
+  "forbidden_hosts": [
+    "clients4.google.com",
+    "www.google.com",
+    "www.google-analytics.com",
+    "#github.com",
+    "#blog.csdn.net"
+  ],
+  "forbidden_clients": [
+    "#127.0.0.1"
   ]
 }
