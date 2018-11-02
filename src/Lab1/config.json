@@ -1,0 +1,6 @@
+{
+  "Forbidden_hosts": [
+    "github.com",
+    "blog.csdn.net"
+  ]
+}

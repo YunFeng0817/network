@@ -12,11 +12,13 @@ public class Client implements Runnable {
     private String Host;
     private long LatestDataTransportTime; // The latest time when socket has data transport
     private final long aliveTime = 30000;
+    private FireWall FileWall;
 
-    Client(Socket Client) {
+    Client(Socket Client, FireWall fireWall) {
         this.Client = Client;
         this.ProxyClient = null;
         this.Host = "";
+        this.FileWall = fireWall;
     }
 
     @Override
@@ -75,6 +77,8 @@ public class Client implements Runnable {
         } catch (IOException e) {
             e.printStackTrace();
         }
+        if (FileWall.isForbidden(this.Host))
+            CloseAllConnect();
         // transport data from server to client
         while (!(Client.isClosed() || ProxyClient.isClosed())) {
             try {
