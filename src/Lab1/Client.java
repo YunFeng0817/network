@@ -68,9 +68,9 @@ public class Client implements Runnable {
         switch (header.getPort()) {
             case 80:
                 // Phish http proxy forward mode
-                forward = new PhishForward();
+//                forward = new PhishForward();
                 // normal http proxy forward mode
-//                forward = new HTTPForward();
+                forward = new HTTPForward();
                 forward.ProxyForward(Client, ProxyClient, aliveTime);
             case 443:
                 forward = new HTTPSForward();
