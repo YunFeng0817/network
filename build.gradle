@@ -24,7 +24,7 @@ javadoc {
 sourceSets {
     main {
         java {
-            srcDirs = ['src/Lab1/']
+            srcDirs = ['src/Lab2/']
         }
     }
     test {
