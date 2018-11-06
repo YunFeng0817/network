@@ -1,5 +1,8 @@
 package Lab2;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.*;
 
@@ -10,12 +13,20 @@ public class Server {
 //        DatagramPacket datagramPacket = new DatagramPacket(test, test.length);
 //        datagramSocket.receive(datagramPacket);
 //        System.out.println(new String(test, 0, datagramPacket.getLength()));
+        File file = new File("./src/Lab2/2.png");
+        if (!file.exists()) {
+            file.createNewFile();
+        }
         while (true) {
             SR test = new SR(8080);
-            String temp = test.receive().toString();
-            System.out.print(temp);
-            if (!temp.equals(""))
+            ByteArrayOutputStream byteArrayOutputStream;
+            byteArrayOutputStream = test.receive();
+            if (byteArrayOutputStream.size() != 0) {
+                FileOutputStream fileOutputStream = new FileOutputStream(file);
+                fileOutputStream.write(byteArrayOutputStream.toByteArray(), 0, byteArrayOutputStream.size());
+                fileOutputStream.close();
                 break;
+            }
             Thread.sleep(50);
         }
     }
