@@ -30,13 +30,16 @@ public class Client {
     }
 
     public static void main(String[] args) throws IOException {
-        System.out.println("Please input destiny server host :");
-        Scanner in = new Scanner(System.in);
-        String host = in.nextLine();
-        System.out.println("Please input destiny server port :");
-        int port = in.nextInt();
-        Client client = new Client(host, port);
-        client.getList();
+//        System.out.println("Please input destiny server host :");
+//        Scanner in = new Scanner(System.in);
+//        String host = in.nextLine();
+//        System.out.println("Please input destiny server port :");
+//        int port = in.nextInt();
+//        Client client = new Client(host, port);
+//        client.getList();
+//        SR test = new SR(host, port);
+        SR test = new SR("localhost", 8080);
+        test.send("testtsettesttesttest".getBytes());
     }
 
 }
