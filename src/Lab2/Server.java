@@ -12,7 +12,10 @@ public class Server {
 //        System.out.println(new String(test, 0, datagramPacket.getLength()));
         while (true) {
             SR test = new SR(8080);
-            System.out.print(test.receive().toString());
+            String temp = test.receive().toString();
+            System.out.print(temp);
+            if (!temp.equals(""))
+                break;
             Thread.sleep(50);
         }
     }

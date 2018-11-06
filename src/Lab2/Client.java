@@ -39,7 +39,7 @@ public class Client {
 //        client.getList();
 //        SR test = new SR(host, port);
         SR test = new SR("localhost", 8080);
-        test.send("testtsettesttesttest".getBytes());
+        test.send("This is data".getBytes());
     }
 
 }

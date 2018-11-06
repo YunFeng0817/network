@@ -78,18 +78,18 @@ public class SR {
             while (i < s) {
                 if (timers.get(i) == -1) {
                     timers.remove(i);
-                    i--;
                     s--;
                 } else {
                     break;
                 }
             }
         } while (sendIndex < content.length || timers.size() != 0); // until data has all transported
+        datagramSocket.close();
     }
 
     ByteArrayOutputStream receive() throws IOException {
         ByteArrayOutputStream result = new ByteArrayOutputStream();
-        DatagramSocket datagramSocket = new DatagramSocket();
+        DatagramSocket datagramSocket = new DatagramSocket(port);
         List<ByteArrayOutputStream> datagramBuffer = new ArrayList<>(); // window buffer,used to resent the data
         DatagramPacket recvPacket;
         int time = 0;
@@ -106,13 +106,13 @@ public class SR {
                     max = seq - max;
                 }
                 ByteArrayOutputStream recvBytes = new ByteArrayOutputStream();
-                System.out.print(recvBytes.toString());
                 recvBytes.write(recv, 2, recvPacket.getLength() - 2);
-                datagramBuffer.set(seq - base, new ByteArrayOutputStream());
+//                System.out.print(new String(recv, 0, recvPacket.getLength()));
+                datagramBuffer.add(seq - base, recvBytes);
                 // send ACK
                 recv = new byte[1];
                 recv[0] = (byte) seq;
-                recvPacket = new DatagramPacket(recv, recv.length);
+                recvPacket = new DatagramPacket(recv, recv.length, recvPacket.getAddress(), recvPacket.getPort());
                 datagramSocket.send(recvPacket);
             } catch (SocketTimeoutException e) {
                 time++;
@@ -128,6 +128,7 @@ public class SR {
                 break;
             }
         }
+        datagramSocket.close();
         return result;
     }
 
