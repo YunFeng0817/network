@@ -1,3 +1,5 @@
+package Lab1;
+
 import java.net.Socket;
 
 /**

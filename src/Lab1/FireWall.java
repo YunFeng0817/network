@@ -1,3 +1,5 @@
+package Lab1;
+
 import java.io.*;
 import java.util.ArrayList;
 import java.util.HashSet;

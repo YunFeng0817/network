@@ -1,3 +1,5 @@
+package Lab2;
+
 import java.io.IOException;
 import java.net.*;
 import java.util.ArrayList;
@@ -15,13 +17,13 @@ public class Client {
     }
 
     List<String> getList() throws IOException {
-        DatagramSocket datagramSocket = new DatagramSocket(port, Server);
+        DatagramSocket datagramSocket = new DatagramSocket();
         byte[] sendBytes;
         sendBytes = "Get List".getBytes();
-        DatagramPacket datagramPacket = new DatagramPacket(sendBytes, sendBytes.length);
+        DatagramPacket datagramPacket = new DatagramPacket(sendBytes, sendBytes.length, Server, port);
         datagramSocket.send(datagramPacket);
         byte[] receiveBytes = new byte[1024];
-        datagramPacket = new DatagramPacket(receiveBytes, receiveBytes.length);
+        datagramPacket = new DatagramPacket(receiveBytes, receiveBytes.length, Server, port);
         datagramSocket.receive(datagramPacket);
         System.out.println(Arrays.toString(datagramPacket.getData()));
         return new ArrayList<>();

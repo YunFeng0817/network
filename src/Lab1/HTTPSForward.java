@@ -1,3 +1,5 @@
+package Lab1;
+
 import java.io.ByteArrayOutputStream;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
