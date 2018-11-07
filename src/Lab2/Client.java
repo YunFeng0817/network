@@ -7,7 +7,6 @@ import java.net.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.*;
 
 public class Client {
     private InetAddress Server;
@@ -41,11 +40,18 @@ public class Client {
 //        client.getList();
 //        SR test = new SR(host, port);
         File file = new File("./src/Lab2/1.png");
+//        File files = new File("./src/Lab2/3.png");
+//        if (!files.exists()) {
+//            files.createNewFile();
+//        }
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
         CloneStream(byteArrayOutputStream, new FileInputStream(file));
         SR test = new SR("localhost", 8080);
         System.out.println(byteArrayOutputStream.size());
         test.send(byteArrayOutputStream.toByteArray());
+//        FileOutputStream fileOutputStream = new FileOutputStream(files);
+//        fileOutputStream.write(test.all.toByteArray(), 0, test.all.size());
+//        fileOutputStream.close();
     }
 
     /**

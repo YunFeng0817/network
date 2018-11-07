@@ -43,9 +43,8 @@ public class SR {
                 temp[0] = new Long(sendSeq).byteValue();
                 oneSend.write(temp, 0, 1);
                 oneSend.write(content, sendIndex, length);
-//                oneSend.write(new byte[0xe0f0], 0, 1);
                 sendIndex += length;
-                DatagramPacket datagramPacket = new DatagramPacket(oneSend.toByteArray(), length, host, port);
+                DatagramPacket datagramPacket = new DatagramPacket(oneSend.toByteArray(), length + 2, host, port);
                 datagramSocket.send(datagramPacket);
                 sendSeq++;
             }
@@ -56,7 +55,7 @@ public class SR {
                     byte[] recv = new byte[1500];
                     recvPacket = new DatagramPacket(recv, recv.length);
                     datagramSocket.receive(recvPacket);
-                    int ack = (int) (new Byte(recv[0]).longValue() - base);
+                    int ack = (int) (recv[0] & 0x0FF - base);
                     timers.set(ack, -1);
                 }
             } catch (SocketTimeoutException e) {  // out of time
@@ -85,7 +84,7 @@ public class SR {
                     break;
                 }
             }
-            if (base == 128) {
+            if (base == 256) {
                 base = 0;
                 sendSeq = 0;
             }
@@ -98,19 +97,21 @@ public class SR {
         DatagramSocket datagramSocket = new DatagramSocket(port);
         List<ByteArrayOutputStream> datagramBuffer = new ArrayList<>(); // window buffer,used to resent the data
         DatagramPacket recvPacket;
+        List<Integer> timers = new ArrayList<>();
         int time = 0;
         datagramSocket.setSoTimeout(1000);
         long max = 0;
         for (int i = 0; i < WindowSize; i++) {
             datagramBuffer.add(new ByteArrayOutputStream());
+            timers.add(0);
         }
         while (true) {
             try {
                 byte[] recv = new byte[1500];
                 recvPacket = new DatagramPacket(recv, recv.length);
                 datagramSocket.receive(recvPacket);
-                long base = new Byte(recv[0]).longValue();
-                long seq = new Byte(recv[1]).longValue();
+                long base = recv[0] & 0x0FF;
+                long seq = recv[1] & 0x0FF;
                 if (seq - base > max) {
                     max = seq - base;
                 }
@@ -122,13 +123,20 @@ public class SR {
                 recv[0] = new Long(seq).byteValue();
                 recvPacket = new DatagramPacket(recv, recv.length, recvPacket.getAddress(), recvPacket.getPort());
                 datagramSocket.send(recvPacket);
+                timers.set((int) (seq - base), -1);
             } catch (SocketTimeoutException e) {
                 time++;
             }
-            if (max == WindowSize - 1) {
+            if (checkWindow(timers)) {
                 ByteArrayOutputStream temp = getBytes(datagramBuffer, WindowSize);
                 result.write(temp.toByteArray(), 0, temp.size());
                 max = 0;
+                datagramBuffer = new ArrayList<>();
+                timers = new ArrayList<>();
+                for (int i = 0; i < WindowSize; i++) {
+                    datagramBuffer.add(new ByteArrayOutputStream());
+                    timers.add(0);
+                }
             }
             if (time > this.MaxTime) {
                 ByteArrayOutputStream temp = getBytes(datagramBuffer, max + 1);
