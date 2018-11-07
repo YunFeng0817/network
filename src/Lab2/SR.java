@@ -8,33 +8,37 @@ import java.util.LinkedList;
 
 class SR {
     private InetAddress host;
-    private int port;
+    private int targetPort, ownPort;
     private int WindowSize = 16;
-    private final int MaxTime = 2; // max time for one datagram
+    private final int sendMaxTime = 2, receiveMaxTime = 4; // max time for one datagram
     private long base = 0;
+    private final int virtualLossRemainder = 17; // this value is used to simulate the loss of the datagram as a remainder
 
-    SR(String host, int port) throws UnknownHostException {
+    SR(String host, int targetPort, int ownPort) throws UnknownHostException {
+        this.ownPort = ownPort;
         this.host = InetAddress.getByName(host);
-        this.port = port;
+        this.targetPort = targetPort;
     }
 
-    SR(int port) {
-        this.port = port;
-    }
-
+    /**
+     * transport content data to host:targetPort
+     *
+     * @param content the content data to transport
+     * @throws IOException
+     */
     void send(byte[] content) throws IOException {
         int sendIndex = 0, length;
         final int MAX_LENGTH = 1024;
-        DatagramSocket datagramSocket = new DatagramSocket();
+        DatagramSocket datagramSocket = new DatagramSocket(ownPort);
         List<ByteArrayOutputStream> datagramBuffer = new LinkedList<>(); // window buffer,used to resent the data
         List<Integer> timers = new LinkedList<>();
         long sendSeq = base;
         do {
-            while (timers.size() < WindowSize && sendIndex < content.length) { // until the window is run up
+            while (timers.size() < WindowSize && sendIndex < content.length && sendSeq < 256) { // until the window is run up
                 timers.add(0);
                 datagramBuffer.add(new ByteArrayOutputStream());
                 length = content.length - sendIndex < MAX_LENGTH ? content.length - sendIndex : MAX_LENGTH;
-                ByteArrayOutputStream oneSend = datagramBuffer.get((int) (sendSeq - base));
+                ByteArrayOutputStream oneSend = new ByteArrayOutputStream();
                 byte[] temp = new byte[1];
                 temp[0] = new Long(base).byteValue();
                 oneSend.write(temp, 0, 1);
@@ -42,22 +46,21 @@ class SR {
                 temp[0] = new Long(sendSeq).byteValue();
                 oneSend.write(temp, 0, 1);
                 oneSend.write(content, sendIndex, length);
-                sendIndex += length;
-                DatagramPacket datagramPacket = new DatagramPacket(oneSend.toByteArray(), length + 2, host, port);
+                DatagramPacket datagramPacket = new DatagramPacket(oneSend.toByteArray(), oneSend.size(), host, targetPort);
                 datagramSocket.send(datagramPacket);
-//                System.out.println("base " + base + " seq" + sendSeq);
+                datagramBuffer.get((int) (sendSeq - base)).write(content, sendIndex, length);
+                sendIndex += length;
+                System.out.println("send the datagram : base " + base + " seq " + sendSeq);
                 sendSeq++;
             }
             datagramSocket.setSoTimeout(1000);
-            DatagramPacket recvPacket;
+            DatagramPacket receivePacket;
             try { // receive ACKs
                 while (!checkWindow(timers)) {
                     byte[] recv = new byte[1500];
-                    recvPacket = new DatagramPacket(recv, recv.length);
-                    datagramSocket.receive(recvPacket);
+                    receivePacket = new DatagramPacket(recv, recv.length);
+                    datagramSocket.receive(receivePacket);
                     int ack = (int) ((recv[0] & 0x0FF) - base);
-//                    System.out.println("seq" + (recv[0] & 0x0FF));
-//                    System.out.println("base" + base);
                     timers.set(ack, -1);
                 }
             } catch (SocketTimeoutException e) {  // out of time
@@ -67,11 +70,18 @@ class SR {
                 }
             }
             for (int i = 0; i < timers.size(); i++) { // update timer
-                if (timers.get(i) > this.MaxTime) { // resend the datagram which hasn't receive ACK and over time
-                    ByteArrayOutputStream temp = datagramBuffer.get(i);
-                    DatagramPacket datagramPacket = new DatagramPacket(temp.toByteArray(), temp.size(), host, port);
+                if (timers.get(i) > this.sendMaxTime) { // resend the datagram which hasn't receive ACK and over time
+                    ByteArrayOutputStream resender = new ByteArrayOutputStream();
+                    byte[] temp = new byte[1];
+                    temp[0] = new Long(base).byteValue();
+                    resender.write(temp, 0, 1);
+                    temp = new byte[1];
+                    temp[0] = new Long(i + base).byteValue();
+                    resender.write(temp, 0, 1);
+                    resender.write(datagramBuffer.get(i).toByteArray(), 0, datagramBuffer.get(i).size());
+                    DatagramPacket datagramPacket = new DatagramPacket(resender.toByteArray(), resender.size(), host, targetPort);
                     datagramSocket.send(datagramPacket);
-                    System.err.println("Resend the datagram : " + (i + base));
+                    System.err.println("resend the datagram : base " + base + " seq " + (i + base));
                     timers.set(i, 0);
                 }
             }
@@ -87,74 +97,73 @@ class SR {
                     break;
                 }
             }
-            if (base == 256) {
-                base = 0;
-                sendSeq = 0;
+            if (base >= 256) {
+                base = base - 256;
+                sendSeq = sendSeq - 256;
             }
         } while (sendIndex < content.length || timers.size() != 0); // until data has all transported
         datagramSocket.close();
     }
 
+    /**
+     * receive data from host:targetPort
+     *
+     * @return the received data
+     * @throws IOException IO exception occur
+     */
     ByteArrayOutputStream receive() throws IOException {
-        int count = 0; // used to simulate datagram loss
+        int count = 0, time = 0; // used to simulate datagram loss
+        long max = 0, receiveBase = -1;
         ByteArrayOutputStream result = new ByteArrayOutputStream(); // store the received content
-        DatagramSocket datagramSocket = new DatagramSocket(port);   // UDP socket to receive datagram and send ACKs
+        DatagramSocket datagramSocket = new DatagramSocket(ownPort);   // UDP socket to receive datagram and send ACKs
         List<ByteArrayOutputStream> datagramBuffer = new LinkedList<>(); // window buffer,used to store the datagram out of order
-        DatagramPacket recvPacket; // one temp datagram packet
-        List<Integer> timers = new LinkedList<>(); // to mark the datagram's status, 0 -> hasn't not received  -1->obtained
-        int time = 0;
+        DatagramPacket receivePacket; // one temp datagram packet
         datagramSocket.setSoTimeout(1000);
-        long max = 0;
         for (int i = 0; i < WindowSize; i++) {
             datagramBuffer.add(new ByteArrayOutputStream());
-            timers.add(0);
         }
         while (true) {
             // receive one datagram and send ACK
             try {
                 byte[] recv = new byte[1500];
-                recvPacket = new DatagramPacket(recv, recv.length);
-                datagramSocket.receive(recvPacket);
-                if (count % 170 != 0) {
+                receivePacket = new DatagramPacket(recv, recv.length, host, targetPort);
+                datagramSocket.receive(receivePacket);
+                // simulate datagram loss when count%virtualLossRemainder ==0
+                if (count % virtualLossRemainder != 0) {
                     long base = recv[0] & 0x0FF;
                     long seq = recv[1] & 0x0FF;
+                    if (receiveBase == -1)
+                        receiveBase = base;
+                    // slide the window
+                    if (base != receiveBase) {
+                        ByteArrayOutputStream temp = getBytes(datagramBuffer, (base - receiveBase) > 0 ? (base - receiveBase) : max + 1);
+                        for (int i = 0; i < base - receiveBase; i++) {
+                            datagramBuffer.remove(0);
+                            datagramBuffer.add(new ByteArrayOutputStream());
+                        }
+                        result.write(temp.toByteArray(), 0, temp.size());
+                        receiveBase = base;
+                        max = max - (base - receiveBase);
+                    }
                     if (seq - base > max) {
                         max = seq - base;
                     }
-//                    System.out.println("i  " + (seq - base));
-//                    System.out.println("timer  " + timers.get((int) (seq - base)));
-                    if (timers.get((int) (seq - base)) == 0) {
-//                        System.out.println(seq);
-                        ByteArrayOutputStream recvBytes = new ByteArrayOutputStream();
-                        recvBytes.write(recv, 2, recvPacket.getLength() - 2);
-                        datagramBuffer.set((int) (seq - base), recvBytes);
-                        // send ACK
-                        recv = new byte[1];
-                        recv[0] = new Long(seq).byteValue();
-                        recvPacket = new DatagramPacket(recv, recv.length, recvPacket.getAddress(), recvPacket.getPort());
-                        datagramSocket.send(recvPacket);
-                        timers.set((int) (seq - base), -1);
-                        System.out.println("Receive datagram " + seq);
-                    }
+                    ByteArrayOutputStream recvBytes = new ByteArrayOutputStream();
+                    recvBytes.write(recv, 2, receivePacket.getLength() - 2);
+                    datagramBuffer.set((int) (seq - base), recvBytes);
+                    // send ACK
+                    recv = new byte[1];
+                    recv[0] = new Long(seq).byteValue();
+                    receivePacket = new DatagramPacket(recv, recv.length, host, targetPort);
+                    datagramSocket.send(receivePacket);
+                    System.out.println("Receive datagram " + seq + " base " + base);
                 }
                 count++;
                 time = 0;
             } catch (SocketTimeoutException e) {
                 time++;
             }
-            if (checkWindow(timers)) { // check if it's ok to slide window
-//                System.out.println("slide");
-                ByteArrayOutputStream temp = getBytes(datagramBuffer, WindowSize);
-                result.write(temp.toByteArray(), 0, temp.size());
-                max = 0;
-                datagramBuffer = new ArrayList<>();
-                timers = new ArrayList<>();
-                for (int i = 0; i < WindowSize; i++) {
-                    datagramBuffer.add(new ByteArrayOutputStream());
-                    timers.add(0);
-                }
-            }
-            if (time > 4) {  // check if the connect out of time
+            if (time > receiveMaxTime) {  // check if the connect out of time
                 ByteArrayOutputStream temp = getBytes(datagramBuffer, max + 1);
                 result.write(temp.toByteArray(), 0, temp.size());
                 break;

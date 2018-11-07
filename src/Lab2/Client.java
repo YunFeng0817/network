@@ -7,21 +7,21 @@ import java.io.IOException;
 public class Client {
 
     public static void main(String[] args) throws IOException, InterruptedException {
-        File file = new File("./src/Lab2/1.png");
-        File files = new File("./src/Lab2/4.png");
-        if (!files.exists()) {
-            files.createNewFile();
+        File file1 = new File("./src/Lab2/1.png");
+        File file2 = new File("./src/Lab2/4.png");
+        if (!file2.exists()) {
+            file2.createNewFile();
         }
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-        CloneStream(byteArrayOutputStream, new FileInputStream(file));
-        SR client = new SR("localhost", 8080);
-        System.out.println("Start to send file 1.png to " + "localhost" + 8080);
+        CloneStream(byteArrayOutputStream, new FileInputStream(file1));
+        SR client = new SR("localhost", 7070, 8080);
+        System.out.println("Start to send file 1.png to " + "localhost " + 7070);
         client.send(byteArrayOutputStream.toByteArray());
-        Thread.sleep(6000);
+        System.out.println("\nStart to receive file 3.png from " + "localhost " + 7070);
         while (true) {
             byteArrayOutputStream = client.receive();
             if (byteArrayOutputStream.size() != 0) {
-                FileOutputStream fileOutputStream = new FileOutputStream(files);
+                FileOutputStream fileOutputStream = new FileOutputStream(file2);
                 fileOutputStream.write(byteArrayOutputStream.toByteArray(), 0, byteArrayOutputStream.size());
                 fileOutputStream.close();
                 System.out.println("Get the file ");
