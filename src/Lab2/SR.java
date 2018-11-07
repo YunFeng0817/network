@@ -156,7 +156,7 @@ class SR {
                     recv[0] = new Long(seq).byteValue();
                     receivePacket = new DatagramPacket(recv, recv.length, host, targetPort);
                     datagramSocket.send(receivePacket);
-                    System.out.println("Receive datagram " + seq + " base " + base);
+                    System.out.println("receive datagram : base " + base + " seq " + seq);
                 }
                 count++;
                 time = 0;
